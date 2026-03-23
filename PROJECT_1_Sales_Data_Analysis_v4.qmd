@@ -1,0 +1,1738 @@
+---
+title: "Project #1: Sales Data Analysis"
+author: "Md Boshirul Azad"
+date: "Spring 2026"
+format:
+  html: 
+    theme: journal
+    fontsize: .85em
+    linestretch: 1.5
+    toc: true
+    toc-expand: 2
+    toc-location: body
+    toc-title: Table of Contents
+execute:
+  echo: false
+  warning: false
+---
+
+```{r Themes}
+# To change look and feel, you can simply adjust themes. 
+# Here is a reference. Simply replace 'simples' with one of these names:
+# https://quarto.org/docs/output-formats/html-themes.html
+
+```
+
+# I. Define the Problem or Question \[Step 1\]
+
+\[What is the purpose of the analysis\] Ans: The purpose of this analysis is to see the trends, top products, customer type, reason behind the sales, gross margin and regions where most sales were made.
+
+\[Who is this analysis for ?\] Ans: This analysis is for the owner of the chain stores and it is also the governance team.
+
+\[Why is it important?\] Ans: This analysis is important for the owner because trough this analysis, he can determine the required changes that should be done in order to increase the revenue and customer interaction.
+
+# II. Detailed Analysis
+
+\[How did you approach your analysis, what techniques did you use\] \[Text\]
+
+## Collect Data \[Step 2\]
+
+\[Summary of key variables and what they mean\] \[Text\]
+
+### Clear Environment
+
+```{r Clear Environment}
+#Clear the environment (be careful with this)
+#rm(list = ls())
+
+```
+
+### Load Libraries and Custom Functions
+
+```{r Load Libraries}
+
+# Clear out the environment
+rm(list=ls())
+
+# Load Libraries
+ library(dplyr) # This library is useful for data manipulation
+library(ggplot2)# This library is useful for data visualization
+library(scales) #Formats output data
+library(janitor) #Formats output data
+library(tidyverse)
+library(forcats)
+library(rlang)
+library(patchwork)
+library(gt)
+
+source("CS217_Functions.R")
+ 
+
+```
+
+### Load Data
+
+```{r Load Raw Data}
+# Load data set 
+
+# KEY: Make sure the file is in your default work directory of your project
+
+sales_data <- read.csv("sales_transactions.csv", header = T) 
+
+#sales_data <- read.csv(file.choose()) # Use this to load a file from the file system. Doesn't work when you render, so make sure to locate the file and put in your working directory.
+
+#summary(sales_data)
+
+#summary(sales_data_clean)
+
+```
+
+## Clean Data \[Step 3\]
+
+### Convert Data to Useful Definitions
+
+```{r clean_that_data_well}
+
+## Clean and organize the data better
+
+#summary(sales_data)
+
+#summary(sales_data)
+
+# This section converts imported character fields into either Date or Factor
+# Factors are good for categorical variables in your analysis
+sales_data_clean <- sales_data %>%
+        mutate(
+          date = as.Date(transaction_datetime, format="%Y-%m-%d"),
+         product_name = as.factor(product_name),
+         #product_id = as.factor(product_id),
+         store_city = as.factor(store_city),
+         store_region = as.factor(store_region),
+         category = as.factor(category),
+         promo_code = as.factor(promo_code),
+         payment_method = as.factor(payment_method),
+         customer_type = as.factor(customer_type),
+         loyalty_member = as.factor(loyalty_member)
+         )
+
+
+# use dplyr for row selection
+
+# df_unit_price_data <- sales_data_clean %>% 
+#   select(product_name, unit_price) %>%
+#   filter(
+#     unit_price > 6 & unit_price <= 10
+#   )
+
+# Exercise
+
+# 1
+# Select product_name, promo_code, customer_type, and unit_price
+# And filter unit_price < 10
+
+# sales_data_clean %>% 
+#   select(product_name, promo_code, customer_type, unit_price) %>%
+#   filter(
+#     unit_price < 10
+#   )
+
+
+# 2
+# Select product_name, promo_code, category, and revenue (line_total)
+# And filter promo_code == "VIP15"
+
+# sales_data_clean %>% 
+#   select(product_name, promo_code, customer_type, unit_price) %>%
+#   filter(
+#     promo_code == "VIP15" & unit_price < 10
+#   )
+
+
+```
+
+```{r}
+#| eval: false
+#| include: false
+#summary(sales_data_clean)
+
+# Use the summary command to look at your data
+#summary(sales_data_clean)
+
+# Check for NA values
+#colSums(is.na(sales_data_clean))
+
+# Removes NA values from the data set 
+#sales_data_clean <- sales_data_clean %>% replace(is.na(.), 0)
+```
+
+### Modify Data - Create Calculated Fields
+
+We have unit level data (price and cost) and aggregate revenue (line_total) and profit (gross margin) but are missing aggregate cost and profit margin %.
+
+```{r Calcuate Fields}
+
+sales_data_clean <- sales_data_clean %>%
+  mutate(
+    line_revenue = line_total,
+    line_total = NULL,
+    line_cost = unit_cost * quantity,
+    gross_margin_pcnt = gross_margin/line_revenue,
+    unit_discount = unit_price * discount_pct,
+    line_discount = unit_discount * quantity
+  ) 
+
+```
+
+1)  Group data by category and show sum of revenue, cost, gross margin, and average gmpcnt.
+
+```{r}
+
+
+group_by_category <- sales_data_clean %>% 
+  group_by(category) %>%
+  summarise(sum_revenue = sum(line_revenue),
+            sum_cost = sum(line_cost),
+            sum_gm = sum(gross_margin),
+            sum_discount = sum(line_discount),
+            avg_discpcnt <- mean(discount_pct),
+            avg_gmpcnt = mean(gross_margin_pcnt)) 
+
+table_by_category <- group_by_category %>% gt()
+
+table_by_category
+
+```
+
+# Group by Store and save in a variable. Create a table and save the table
+
+```{r}
+group_by_store <- sales_data_clean %>% 
+  group_by(store_city) %>%
+  summarise(sum_revenue = sum(line_revenue),
+            sum_cost = sum(line_cost),
+            sum_gm = sum(gross_margin),
+            sum_discount = sum(line_discount),
+            avg_discpcnt <- mean(discount_pct),
+            avg_gmpcnt = mean(gross_margin_pcnt)) 
+
+table_by_store <- group_by_store %>% gt()
+
+group_by_store
+
+
+
+```
+
+## Explore Data \[Step 4\]
+
+### Evaluate your overall data set using SKIMR
+
+Here is a checklist of things to check on when evaluating data:
+
+1.  Check the structure and metadata - Evaluate how many rows, columns, data-types, and so forth. Ans: There are 2500 rows and 18 column in sales date and after cleaning up the data by changing the variable type and making some necessary column by using mutate function now it has 2500 rows and 23 column.
+
+2.  Missing Data - Evaluate if your data is complete and identify missing data overall and, if so, particular patterns (e.g. "monday transaction data always is missing cost")
+
+3.  Data Quality & Consistency - What are the ranges of values and does the data make sense? Are data elements consistent - e.g. is "M", "Male", and "Men" values in the same field
+
+4.  Relationships and Distributions - Evaluate the summary statistics - mean, std. deviation, min, max, etc. - and the distribution of the data. Is it normally distributed?
+
+5.  Test of Reasonableness (TOR) - Does the data make sense in the context of the analysis?
+
+SKIMR provides a quick way to look at all the key aspects of your data with a single command. The first window looks at your overall data set and then each subsequent window looks at the variables based on type (chr, factor, date, etc.).
+
+```{r load_skimr_and_clean}
+library(skimr)
+skimr::skim(sales_data_clean)
+
+```
+
+This is not a fun step but is important to do early in your analysis. Remember the GIGO principle - garbage in = garbage out. If you have bad data, no amount of brilliant analysis will over come it.
+
+### Exploratory Analysis Table - Build Table to Focus Analysis
+
+The table helps the analyst ensure all the main information is analyzed. For each categorical variable, evaluate each numeric value. Judgement should be applied and unnecessary or unrelated data can be eliminated but it is important to ensure it is a conscious decision.
+
+The table below lists the combination of categorical and numeric variables that should be analyzed.
+
+```{r}
+
+# Call the function to create a table of the combinations of variables to analyze
+make_var_checklist <- (sales_data_clean)
+
+```
+
+***Evaluate all numeric values to determine patterns in the data***
+
+```{r}
+
+# Plots all Numeric Values and tailors the visual appearance based on last class examples
+numeric_plots <- plot_numeric_distributions(data = sales_data_clean, 
+                           hist_color = "pink", 
+                           dens_color = "skyblue")
+
+
+numeric_plots
+
+
+```
+
+***Evaluate numeric values grouped by categorical values***
+
+1.  Evaluate all numeric data by customer type
+
+```{r}
+
+# Note - the function 'plot_numeric_by_factor' 
+
+v_plot_numeric_by_customer_type <- 
+  plot_numeric_by_categorical(data = sales_data_clean, 
+                                              categorical_var = customer_type) #Factor should have <10 distinct values - so don't use this for product_names!
+
+v_plot_numeric_by_customer_type
+
+```
+
+Findings:
+
+-   Unit cost and unit price between new and returning customer is very similar. Between both groups, unit price is constantly higher than unit cost, which indicated stable markup structure.
+
+-   Returning customers shows more gross margin percent than new customers. It indicates returning customers can bring comparatively more profit per transaction.
+
+-   Most sales come from small purchases, though a handful of big ones push total income up—true for both fresh and repeat buyers. Revenue figures tilt toward lower amounts, yet spike because of rare expensive orders. Bigger deals pop up rarely. The pattern holds steady across customer groups, leaning right on the scale each time.
+
+2.  Evaluate all numeric data by store city location
+
+```{r}
+v_plot_numeric_by_store_city <- plot_numeric_by_categorical(data = sales_data_clean, 
+                            categorical_var = store_city)
+v_plot_numeric_by_store_city
+
+```
+
+Findings:
+
+-   Every city, line revenue and line cost are skewed right. This means most of the transaction are happening are of low prices.
+
+-   With gross margin and line revenue, Chicago, Los Angeles, and New York shows more deviation. It means there are more transaction and they have more sales volume compared to other cities.
+
+-   The gross margin percent distributions are similar across all the cities. Indicating a standardized pricing and profit ratio across markets.
+
+-   Most cities, the spread of prices and costs look alike. The price is always above the cost.
+
+-   In terms of quantity, the distribution is skewed right and this indicates most of the customers buy small value items.
+-   Discounts are always little to nothing. Occasional some discounts appear, which shows selective discount on specific items. 
+3.  Evaluate all numeric data by store region
+
+```{r}
+v_plot_numeric_by_store_region <- plot_numeric_by_categorical(data = sales_data_clean, 
+                            categorical_var = store_region)
+v_plot_numeric_by_store_region
+
+```
+
+-   For all the region, Revenue and cost are skewed right and it means transactions are small in value but higher in quantity.
+-   Gross margin percentages, are consistent across the regions, showing standardized pricing and profit ratio.
+-   All the regions, had little to no discount for most transaction.
+
+-   Unit price and unit cost are similar every where and it indicates a stable markup structure across regions.
+
+-   Quantity distribution is skewed right and it indicates that the most purchases are made are small and some in bulk.
+-   West and Northwest shows slightly better performance in GM. This is a indication on higher sales and stronger transaction.
+4.  Evaluate all numeric data by product category
+
+```{r}
+#v_plot_numeric_by_product_name <- 
+ # plot_numeric_by_categorical(
+  #data = sales_data_clean,
+  #categorical_var = product_name)
+
+#v_plot_numeric_by_product_name
+                                                                 
+```
+
+
+
+Findings
+
+-   X
+
+-   Y
+
+-   Z
+
+***Utilize bar charts to compare and rank numeric data by a category***
+
+1.  Evaluate top 20 revenue generating products
+
+```{r}
+
+# Evaluate each IMPORTANT numeric value by each IMPORTANT categorical value
+
+# Top 20 highest generated revenue by product
+top20_products <- bar_summary(data = sales_data_clean, 
+            group_by_col = product_name, 
+            numeric_col = line_revenue, 
+            title="Revenue By Category", 
+            subtitle = "Top 20 Revenue Products",
+            top_n = 20,
+            fill_color = "purple")
+
+
+top20_products
+
+
+```
+
+```{r}
+top_5_products_pcnt <- sales_data_clean %>% 
+                        group_by(product_name)%>%
+                        summarise(sum_rev= sum(line_revenue)) %>%
+                        arrange(desc(sum_rev)) %>%
+                        head(5) %>%
+                        pull(sum_rev)
+dollar(sum(top_5_products_pcnt))
+```
+
+Findings:
+
+-   Top product by is USB Flash Drive 128GB which has \$34,099.
+
+-   Top 5 is high % of total is \$134274.
+
+2.  Evaluate top 5 revenue generating stores
+
+```{r}
+# Top half of stores by revenue (10 stores, looking at 5)
+top_5_rev_stores <- bar_summary(data = sales_data_clean, 
+            group_by_col = store_city, 
+            numeric_col = line_revenue, 
+            top_n = 10,
+            title="Revenue By Store City", 
+            subtitle = "Top 5 Revenue Generating Stores",
+            fill_color = "navy")
+
+top_5_rev_stores
+
+```
+
+```{r}
+store_cities_less<- sales_data_clean %>%  filter(line_revenue < 10000)
+
+store_cities_less <-  bar_summary(data = store_cities_less, 
+            group_by_col = store_city,
+            numeric_col = line_revenue, 
+            top_n = 10,
+            title="Less Revenue By Store City", 
+            subtitle = "Stores With Less Revenue",
+            fill_color = "navy")
+
+store_cities_less
+
+```
+
+Findings
+
+-   The highest revenue generating stores by city was New York and they generated \$43,772.
+
+-   Stores in Los Angeles and Chicago were after New York in terms of revenue, which is \$31,084 and \$30,113.
+
+-   Rest of the cities has transactions below \$10,000.
+
+3.  Evaluate top 25 most profitable products
+
+```{r}
+
+# In this example, assign the output of bar_summary function, which is a graph to a variable and then just list the variable to output the result
+
+plot_gm <- bar_summary(sales_data_clean, 
+                       group_by_col = product_name, 
+                       numeric_col = gross_margin_pcnt, 
+                       title="CS217- GM% By Product", 
+                       subtitle = "Top Products by GM%", 
+                       top_n = 25, currency = FALSE, 
+                       include_other = FALSE, 
+                       sum_data = FALSE) #Looks at avg, not sum
+
+plot_gm
+
+
+```
+
+Findings:
+
+-   Ballpoint Pens 10ct and Notebook A5 has the highest two gross margin percent 71% and 70%.
+
+-   Most products cluster between 50% to 60% GM%.
+
+-   Espresso Pods 20ct and Paper Towels 6pk has the least GM% , with 39% and 43% accordingly.
+
+4.  Evaluate top 5 most profitable product categories
+
+```{r}
+
+# In this example, assign the output of bar_summary function, which is a graph to a variable and then just list the variable to output the result
+
+plot_gm <- bar_summary(sales_data_clean, 
+                       group_by_col = product_name, 
+                       numeric_col = gross_margin, 
+                       title="CS217- GM By Product", 
+                       subtitle = "Top Products by GM", 
+                       top_n = 25, 
+                       currency = TRUE, 
+                       include_other = FALSE, 
+                       sum_data = TRUE) #Looks at avg, not sum
+
+plot_gm
+
+
+
+
+```
+- USB Flash Drive 128GB
+- Premium Coffee Beans 1kg
+- Espresso Pods 20ct
+- Luxury Chocolate 200g
+- Toilet Paper
+### Perform a Trend Analysis
+
+Perform a time series analysis. The key value of trend analysis is to see change in values over time (can be a date, age of a person, how long people are in line, etc.).
+
+1.  Evaluate monthly trends of revenue by month
+
+```{r}
+
+# Look at the monthly trend for all transactions
+aggregate_sales_by_week_by_city <- trend_time_series(
+  data=sales_data_clean,
+  date_col = date,
+  line_revenue,
+  stat = "sum",
+  freq = "week",
+  facet_by = store_city,
+  title = "CS217: Monthly Revenue by Product by Store"
+  
+)
+
+
+aggregate_sales_by_week_by_city
+
+
+```
+
+Findings
+
+-   New York has the highest amount of monthly revenue generated among all the cities.
+
+2.  Evaluate monthly trends of revenue by month by product category
+
+```{r}
+
+# Evaluate the trend of revenue by store
+trend_revenue_by_category <- trend_time_series(
+  data=sales_data_clean,
+  date_col = date,
+  line_revenue,
+  stat = "sum",
+  freq = "month",
+  facet_by = category,
+  title = "CS217: Monthly Revenue by Product"
+  
+)
+
+trend_revenue_by_category
+
+```
+
+Findings - Beverages generated most of profit then any other product. - During June and July, stationery items were lowest. Most probably for students getting summer break.
+
+3.  Evaluate monthly trend by month and any other category
+
+```{r}
+
+# Evaluate the trend of revenue by store
+trend_revenue_by_promo_code <- trend_time_series(
+  data=sales_data_clean,
+  date_col = date,
+  line_revenue,
+  stat = "sum",
+  freq = "month",
+  facet_by = promo_code,
+  title = "CS217: Monthly Revenue by Promo Code"
+  
+)
+
+
+trend_revenue_by_promo_code
+
+
+
+```
+
+Finding
+
+-   Highest revenue made by promo code was SUMMER10 and CLEARANCE20 made the least revenue.
+
+4.  Look at Gross Margin \$ by a key categorical variable
+
+```{r}
+
+
+# Evaluate the trend of revenue by store
+trend_gm_by_promo_code <- trend_time_series(
+  data=sales_data_clean,
+  date_col = date,
+  gross_margin,
+  stat = "sum",
+  freq = "month",
+  facet_by = promo_code,
+  title = "CS217: Monthly GM by Promo Code"
+  
+)
+
+
+trend_gm_by_promo_code
+
+
+
+
+# Evaluate the trend of revenue by store
+trend_gmpcnt_by_promo_code <- trend_time_series(
+  data=sales_data_clean,
+  date_col = date,
+  gross_margin_pcnt,
+  stat = "mean",
+  freq = "month",
+  currency = FALSE,
+  facet_by = promo_code,
+  title = "CS217: Monthly GM% by Promo Code"
+
+)
+
+
+trend_gmpcnt_by_promo_code
+
+
+```
+
+Finding
+
+Graph 1
+
+-   The highest amount of GM was made by SUMMER10 promo code and it has a GM between $5000 and $7000, and CLEARANCE20 gave the least GM of around $1000-$1700.
+
+Graph 2
+
+-   GM% wise, products with NONE promo code made more profit with the peak of  approximately 54.5% and second place was promo with WEEKENDS. Here also CLEARANCE has the least profit provider by giving GM% of around 40%.
+
+***Utilize Box Plots to Evaluate Distribution of Revenue by City by Promotion Code***
+
+```{r Analyze Data}
+
+## Visualize Clean Data
+box_plot_graph <- sales_data_clean %>% 
+ggplot(aes(x=store_city,
+           y=gross_margin)) +
+  labs(x="City Location",
+       y="GM",
+       title="Evaluating GM By City")+
+      geom_boxplot(outlier.colour = "blue")+
+  facet_wrap(~category) + 
+  #facet_grid(customer_type~payment)
+  theme_grey()+ #Overrides the default theme for the entire graph
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) #Adjus
+
+# No theming
+box_plot_graph
+
+# box_plot_graph + theme_gray() +
+#   theme(axis.text.x = element_text(angle = 45, hjust = 1)) # the default
+# 
+# box_plot_graph + theme_bw()+
+#   theme(axis.text.x = element_text(angle = 45, hjust = 1))
+# 
+# box_plot_graph + theme_light()+
+#   theme(axis.text.x = element_text(angle = 45, hjust = 1))
+# 
+# box_plot_graph + theme_dark()+
+#   theme(axis.text.x = element_text(angle = 45, hjust = 1))
+# 
+# box_plot_graph + theme_minimal()+
+#   theme(axis.text.x = element_text(angle = 45, hjust = 1))
+# 
+# box_plot_graph + theme_classic()+
+#   theme(axis.text.x = element_text(angle = 45, hjust = 1))
+# 
+# box_plot_graph + theme_void()+
+#   theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+```
+Finding
+
+-  Across cities, Hardware has the largest spread and most outliers, which shows more transaction and profit.
+
+-  Household, personal, and stationary products are very stable in all cities. It indicates similar distribution across all cities and predictable gross margin.
+
+-  New York, Chicago, and Los Angeles has most spread and outliers troughout most of the product, and Phoenix and Denver shows a good transaction but not as good as the three cities.
+
+Evaluate boxplot by revenue by product category by loyalty customer type (New or Returning)
+
+```{r}
+
+## Visualize Clean Data
+box_plot_graph <- sales_data_clean %>% 
+ggplot(aes(x=line_revenue,
+           y=customer_type)) +
+  labs(x="Gross Margin",
+       y="Customer Type",
+       title="Evaluating Revenue By Customer Type by City")+
+      geom_boxplot(outlier.colour = "navy")+
+  facet_wrap(~store_city) + 
+  #facet_grid(customer_type~payment)
+  theme_grey()+ #Overrides the default theme for the entire graph
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) #Adjus
+
+# No theming
+box_plot_graph
+
+
+```
+Findings
+
+-  Across most cities, returning customers gave higher gross margin than new customers, which makes targeting the existing customer is ideal to increase the sales and profit.
+### Correlation - Evaluate Relationship of Numeric Values
+
+1.  Evaluate relationship of all numeric values in a correlation matrix
+
+```{r}
+
+library(ggcorrplot)   # heatmap-style correlation plot
+
+# ----- Correlation matrix -----
+# Create a correlation matrix of numerical values
+cor_mat <- round(cor(sales_data_clean %>% select(where(is.numeric))), 2) #select only numeric columns
+#print(cor_mat)
+
+
+# ----- Heatmap correlation plot -----
+ggcorrplot::ggcorrplot(
+  cor_mat,
+  type = "lower",
+  lab = TRUE,
+  lab_size = 3.5,
+  tl.cex = 10
+)
+
+
+```
+Strong positive Correlation:
+
+-  As quantity goes up gross margin, line revenue, line cost, and line discount goes up.
+
+-  Discount percent and unit discount are strongly correlated. As one goes up, other one goes up too.
+
+-  Gross margin goes up with Line revenue and line cost.
+
+-  Line revenue increases with increasing line cost and line discount
+
+-  Line cost and unit discount goes up with line discount,
+
+Strong negative Correlation:
+
+-  If unit discount, line discount, line cost, and unit cost goes up gross margin percent goes down.
+
+2.  Evaluate Correlation of Key Numeric Values
+
+```{r}
+
+# Visualize key values
+
+sales_data_clean %>% # This sends all the data to ggplot
+ggplot(aes(x=unit_price,y=quantity)) + #ggplot reads in the columns 
+  labs(x ="Unit Price", #label x
+       y="Qty Sold", #label y
+       title="Evaluating Unit Price and Quantity Sold")+#label title
+      geom_point() #perform a point plot
+
+cor(sales_data_clean$unit_price,sales_data_clean$quantity)
+
+
+```
+Finding
+
+-  There is no strong correlation between unit price and quantity sold. The distribution is to scattered and there are some extreme values.
+
+3.  Evaluate correlation between discount level and quantity sold
+
+```{r}
+
+### CLASS EXERCISE
+
+sales_data_clean %>% # This sends all the data to ggplot
+ggplot(aes(x=discount_pct,
+           y=quantity)) + #ggplot reads in the columns 
+  labs(x ="Discount%", #label x
+       y="quantity", #label y
+       title="Evaluating Correlation bw Discount % & quantity")+#label title
+      geom_point() #perform a point plot
+
+
+
+```
+Finding
+
+-  There is no strong correlation between quantity and discount . The distribution is to scattered and there are some extreme values.
+### Distributions - Evaluate Spread of Values
+
+1\. Evaluate Distribution of Revenue Data Points
+
+```{r}
+
+# Plot histogram with normal curve based on count
+# Unit Price
+
+sales_data_clean %>% 
+ggplot(aes(x = line_revenue)) +
+    geom_histogram(aes(y = after_stat(count)), bins = 25, fill = "purple", color = "blue", alpha = 0.7) +
+  #geom_density(color = "red", size = 1.2) +
+  geom_vline(aes(xintercept = mean(unit_price)), color = "orange", linetype = "dashed", size = 1) +
+  theme_grey() +
+  labs(
+    title = "Normal Distribution of Revenue",
+    subtitle = "Most values cluster around the mean, with symmetric tails",
+    x = "Revenue",
+    y = "Count"
+  )+
+  facet_wrap(~store_region)
+
+## Unit Cost
+
+```
+Finding
+
+-  All the graphs are skewed right and it means most of the low value small are in the left and on the right there are some high value product with low quantity.
+
+-  West and Northeast shows big spread.It shows more transaction and more profit.
+2.  Evaluate Distribution of Unit Cost by Category
+
+```{r}
+
+sales_data_clean %>% 
+ggplot(aes(x = unit_cost)) +
+    geom_histogram(aes(y = after_stat(count)), bins = 100, fill = "navy", color = "blue", alpha = 0.7) +
+  #geom_density(color = "red", size = 1.2) +
+  geom_vline(aes(xintercept = mean(unit_cost)), color = "orange", linetype = "dashed", size = 1) +
+  theme_grey() +
+  labs(
+    title = "Normal Distribution of Unit Cost",
+    subtitle = "Most values cluster around the mean, with symmetric tails",
+    x = "Unit Cost",
+    y = "Count"
+  )+
+  facet_wrap(~category)
+
+```
+Findings
+
+-  There are clusters on specific price point and non of the graph is bell shaped or normally distributed.
+
+-  Beverages, hardware, and Household has the highest peak, which shows higher cost values.
+
+-  The other product categories are clustered around lower price mark.
+
+3.  Evaluate Distribution of Quantity Sold By Product Category
+
+```{r}
+
+### CLASS EXAMPLE
+
+sales_data_clean %>%
+ggplot(aes(x = quantity)) +
+  geom_histogram(aes(y = after_stat(count)), bins = 50, fill = "grey1", color = "black", alpha = 0.7) +
+  geom_vline(aes(xintercept = mean(quantity)), color = "red", size = 1) +
+  theme_minimal() +
+  labs(
+    title = "Normal Distribution of Quantity by Product Category",
+    subtitle = "Most values cluster around the mean, with symmetric tails",
+    x = "Quantity",
+    y = "Count"
+  )+
+  facet_wrap(~category)
+
+
+```
+Findings
+
+-  None of the graphs are normally distributed.
+
+-  Beverages, Hardware, Household, and snakes has some strong peaks, suggesting good performance in sales.
+-  Housewares, personal, and stationary are clustered on lower end. It means they are sold in small quantity.
+
+### Pareto - Identify Relationship of Inputs to Outputs ("80/20 Rule")
+
+1.  Perform a Pareto Analysis of Revenue by Product
+
+```{r}
+
+
+pareto_rev_by_prod <- plot_pareto_graph(sales_data_clean, 
+                  group_by_col = product_name, 
+                  numeric_col = line_revenue, 
+                  color_var = "cornflowerblue", 
+                  color_var_hline = "orange")
+
+pareto_rev_by_prod
+
+```
+Findings
+
+-  Only 5 products accumulated about 80% of total revenue. These are only 20% of total products. They are USB Flash Drive 128GB, Premium Coffee Beans 1kg, Espresso Pods 20ct, Toilet Paper 12pk, Luxury Chocolate 200g.
+
+2.  Perform a pareto analysis of revenue and store city location
+
+```{r}
+pareto_rev_by_city <- plot_pareto_graph(sales_data_clean, 
+                  group_by_col = store_city, 
+                  numeric_col = line_revenue, 
+                  color_var = "cornflowerblue", 
+                  color_var_hline = "orange")
+
+pareto_rev_by_city
+
+```
+Finding
+
+-  Out of top 10 cities, 6 of them generated ~81% of total revenue. The 6 cities make 60% of the top cities. They are New York, Los Angeles, Chicago, Dallas, Atlanta, and Boston.
+3.  Perform a pareto analysis of revenue and Category location
+
+```{r}
+
+pareto_rev_by_category <- plot_pareto_graph(sales_data_clean, 
+                  group_by_col = category, 
+                  numeric_col = line_revenue, 
+                  color_var = "cornflowerblue", 
+                  color_var_hline = "orange")
+
+pareto_rev_by_category
+
+
+```
+Finding
+
+-  Four products made ~94% of total revenue but are 57% of total products. They are Beverages, Hardware, Household, and snakes.
+### Build A Report to Evaluate Impact of Promotions
+
+1.  Evaluate Impact of Promotions on Qty Sold, Unit Price, and Profit
+
+```{r}
+
+library(gt)
+
+multi_promo_products <- sales_data_clean %>% 
+  group_by(product_name, promo_code) %>%
+  summarize(
+    promotions = n(),
+    total_qty_sold = sum(quantity),
+    avg_unit_price = mean(unit_price),
+    sum_revenue = sum(line_revenue),
+    rev_per_transaction = sum_revenue / total_qty_sold,
+    sum_profit = sum(gross_margin),
+    profit_per_transaction = sum_profit / total_qty_sold,
+    avg_disc_pcnt = mean(discount_pct),
+    avg_gm = mean(gross_margin),
+    avg_gm_pcnt = mean(gross_margin_pcnt),
+    .groups = "drop"
+  )
+
+# Build a nice gt table
+multi_promo_products %>%
+  gt(rowname_col = "promo_code", groupname_col = "product_name") %>%
+  fmt_currency(columns = c(avg_unit_price, sum_revenue, rev_per_transaction, 
+                           sum_profit, profit_per_transaction, avg_gm),
+               currency = "USD") %>%
+  fmt_number(columns = c(promotions, total_qty_sold), decimals = 0) %>%
+  fmt_percent(columns = c(avg_disc_pcnt, avg_gm_pcnt), decimals = 1) %>%
+  tab_header(
+    title = "Promo Performance by Product",
+    subtitle = "Sales, Revenue, Profitability, and Discounts"
+  ) %>%
+  cols_label(
+    promotions = "Transactions",
+    total_qty_sold = "Total Qty Sold",
+    avg_unit_price = "Avg Unit Price",
+    sum_revenue = "Total Revenue",
+    rev_per_transaction = "Revenue / Unit",
+    sum_profit = "Total Profit",
+    profit_per_transaction = "Profit / Unit",
+    avg_disc_pcnt = "Avg Discount %",
+    avg_gm = "Avg Gross Margin",
+    avg_gm_pcnt = "Avg GM %"
+  ) %>%
+  tab_options(
+    table.font.size = px(13),
+    data_row.padding = px(5)
+  )
+
+```
+Impact of Quantity sold:
+
+-  Promotions significantly increased quantity sold. All the promo code showed high sales in numbers.
+
+Impact of Unit price:
+
+-  Promos reduces the prices on product but the higher the number of sales.
+
+Impact on Profit:
+
+-  Even though unit price decreases because of promo codes which lowers the profit too but the boost in sales because of promo increases the profit than in reduces.
+
+2.  Evaluate Relationship of Promotions to Quantity Sold For All Products - Visually
+
+Visualizing complex relationships is a powerful way to derive meaning from data.
+
+```{r}
+
+
+# Fourth, look at complex data visually. See the difference?
+multi_promo_products <- sales_data_clean %>% 
+  group_by(product_name, promo_code) %>%
+  summarize(promotions = n(),
+            total_qty_sold = sum(quantity),
+            avg_unit_price = mean(unit_price),
+            sum_revenue = sum(line_revenue),
+            rev_per_transaction = (sum_revenue/total_qty_sold),
+            sum_profit = sum(gross_margin),
+            profit_per_transaction = (sum_profit/total_qty_sold),
+            avg_disc_pcnt = mean(discount_pct),
+            avg_gm = mean(gross_margin),
+            avg_gm_pcnt = mean(gross_margin_pcnt)) 
+
+
+  # slice_max(order_by = successful_promo, n = 1, with_ties = FALSE) %>%
+  # ungroup()
+
+
+# Boxplot for Quantity
+ggplot(sales_data_clean, aes(x = promo_code, y = line_revenue, fill = promo_code)) +
+  geom_boxplot(outlier.alpha = 0.3) +
+  facet_wrap(~ category) +
+  labs(
+    title = "Distribution of Quantity by Promo Code",
+    x = "Promotion Code",
+    y = "Revenue"
+  ) +
+  theme_minimal(base_size = 12) +
+  theme(legend.position = "none", axis.text.x = element_text(angle = 45, hjust = 1))
+
+
+```
+Finding
+
+-  Beverage, household, housewares, and hardware are greatly impacted by promo codes. These promo codes helped sales in more higher quantity.
+
+-  Among the promos SUMMER10, CLEARANCE are effective and after these VIP15 is good.
+
+-  
+```{r}
+
+sales_data_clean %>%
+  ggplot(aes(x=date,y=gross_margin))+
+  geom_line()+
+  labs(title = "Gross Margin by Date")+
+  facet_wrap(~category)+
+  theme_light()
+
+
+```
+
+3.  Now evaluate revenue by Promotion Code Over Time
+
+```{r}
+
+sales_data_clean %>%
+  ggplot(aes(x=date,y=line_revenue))+
+  geom_line()+
+  labs(title = "Gross Margin by Date")+
+  facet_wrap(~promo_code)+
+  theme_light()
+
+
+
+sales_data_clean %>%
+  ggplot(aes(x=date,y=line_revenue))+
+  geom_line()+
+  labs(title = "Revenue Trend by Category by Promo Code")+
+  facet_grid(category~promo_code)+
+  theme_light()+
+    theme_minimal(base_size = 12) +
+  theme(legend.position = "none", axis.text.x = element_text(angle = 45, hjust = 1))
+
+
+
+```
+Findings
+
+-  SUMMER10 and VIP15 shows that they have generated more revenue among all the products.
+
+-  CLEARANCE also showed strong revenue but mostly with the beverages.
+
+-  WEEKEND5 shows more strong and consistent revenue across all category.
+
+-  NONE is mostly flat line among all the categories.
+
+4.  Now evaluate Revenue by Product by City Over Time
+
+```{r}
+
+top_products = sales_data_clean %>%
+  group_by(product_name) %>%
+  summarize(total_revenue = sum(line_revenue)) %>%
+  arrange(desc(total_revenue)) %>% head(5) %>% pull(product_name)
+
+
+sales_data_clean %>%
+  filter(
+    product_name %in% top_products
+  ) %>%
+  ggplot(aes(x=date,y=line_revenue))+
+  geom_line()+
+  labs(title = "Revenue Trend by Category by Promo Code")+
+  facet_grid(product_name~store_city)+
+  theme_light()+
+    theme_minimal(base_size = 12) +
+  theme(legend.position = "none", axis.text.x = element_text(angle = 45, hjust = 1))
+
+
+```
+Finding
+
+-  New York, Chicago, and Los Angeles shows the highest number of revenue spikes across products.
+
+-  Dallas, Denver, and Seattle shows moderate revenue spike.
+
+-  Boston and Phoenix are mostly flatter revenue but occasionally a little spike.
+
+5.  Now evaluate revenue by Product by City
+
+```{r}
+top_products = sales_data_clean %>%
+  group_by(product_name) %>%
+  summarize(total_revenue = sum(line_revenue)) %>%
+  arrange(desc(total_revenue)) %>% head(5) %>% pull(product_name)
+
+
+sales_data_clean %>%
+  filter(
+    product_name %in% top_products
+  ) %>%
+  ggplot(aes( y=line_revenue))+
+  geom_boxplot()+
+  labs(title = "Revenue Trend by Category by Promo Code")+
+  facet_grid(product_name~store_city)+
+  theme_light()+
+    theme_minimal(base_size = 12) +
+  theme(legend.position = "none", axis.text.x = element_text(angle = 45, hjust = 1))
+
+
+
+
+```
+
+## Analyze Data \[Step 5\]
+
+The exploration phase of the analytic process is intended to expansive and generative, asking "what does the data tell me?" to the analysis phase, which is more focused on **outcome** in relation to the objective, and asks "what does the data mean?".
+
+It is a subtle but important mind shift.
+
+### Analysis 1: Analyze Sales Data
+
+Question: What was overall sales revenue across all stores?
+
+```{r total_revenue}
+library(scales)
+
+total_revenue <- dollar(sum(sales_data_clean$line_revenue)) 
+
+top_city <- sales_data_clean%>% select(store_city, line_revenue) %>% 
+  group_by(store_city)%>% summarise(total_revenue= sum(line_revenue)) %>% 
+  arrange(desc(total_revenue)) %>% head(1) %>%
+  pull(store_city)
+
+top_city <- sales_data_clean%>% select(store_city, line_revenue) %>% group_by(store_city)%>% summarise(total_revenue= sum(line_revenue)) %>% 
+  arrange(desc(total_revenue)) %>% head(1) %>%
+  pull(total_revenue) %>% dollar()
+
+top_city <- sales_data_clean%>% select(store_city, line_revenue) %>% group_by(store_city)%>% summarise(total_revenue= sum(line_revenue)) %>% 
+  arrange(total_revenue) %>%
+  head(1) %>%
+  pull(store_city)
+
+top_city
+"" #replace
+top_city_rev <- 0 #replace
+```
+
+Our total sales revenue was **`r total_revenue`**.
+
+Question: What are the best selling products?
+
+```{r Analysis 1-Sales}
+
+# Class Exercise 
+
+best_selling_products <- sales_data_clean %>% #data set sales_data_clean
+  group_by(product_name) %>% # Groups the data set by Product
+  summarize( TOTAL_REVENUE = sum(line_revenue) ) %>% #Creates a group level column name TOTAL_REVENUE & sums the REVENUE by product (the grouping variable)
+  arrange(desc(TOTAL_REVENUE)) %>% #Sorts by Total Revenue
+  mutate(TOTAL_REVENUE = dollar(TOTAL_REVENUE)) %>% #formats TOTAL_REVENUE in a dollar format and replaces the original value. 
+  head(15) # Take the top 15 products. This can be any number.
+
+# Here is a way to get individual fields
+top_rev_product <- sales_data_clean %>%
+  group_by(product_name) %>%
+  summarize( TOTAL_REVENUE = sum(line_revenue) ) %>%
+  arrange(desc(TOTAL_REVENUE)) %>%
+  mutate(TOTAL_REVENUE = dollar(TOTAL_REVENUE)) %>%
+  head(1) %>%
+  pull(TOTAL_REVENUE)
+  
+top_rev_product
+
+  best_selling_products[1,1] #get the first row and first column in the data set
+top_rev_product_rev <- 0 #Replace with real values
+
+```
+
+The best selling product is `r top_rev_product` and brought in **`r top_rev_product_rev`**
+
+Display a nice table of the best selling 15 products:
+
+```{r}
+
+#best_selling_products  #prints the raw output (dataframe named best_selling_products) 
+
+tabel_best_selling_prods <- best_selling_products %>% gt() #pipes the raw output (dataframe named best_selling_products) to gt, a table library. See the difference?
+
+tabel_best_selling_prods
+
+```
+
+### Analysis 2: Analyze Profit Data
+
+Question: What is the overall profitability (Revenue - Cost)?
+
+```{r}
+
+total_profit <- dollar(sum(sales_data_clean$gross_margin))
+
+total_profit
+
+```
+
+Our total profit was **`r total_profit`**
+
+Question: Which Products are the most profitable?
+
+```{r Analysis 2-Profitability}
+library(scales)
+
+most_profitable_product_name <- sales_data_clean %>% 
+  group_by(product_name) %>% 
+
+  summarise(profit = mean(gross_margin_pcnt) )%>%
+    
+    
+    arrange(desc(profit))%>%
+    head(5)%>%
+    pull(product_name)
+  
+  most_profitable_product_name
+# Replace with real value.
+most_profitable_product_margin <- 0 # Replace with real values
+
+```
+
+The most profitable product is `r most_profitable_product_name` and the total profit is `r most_profitable_product_margin`
+
+Here are the top 15 most profitable items: 1.Sparkling Water 12pk\
+2.Dish Soap 750ml\
+3.Ballpoint Pens 10ct\
+4.Protein Bar\
+5.Toothpaste 100ml\
+6.Hand Soap 500ml\
+7.Notebook A5\
+8.USB Flash Drive 128GB 9.Premium Coffee Beans 1kg\
+10.Desk Lamp 11.Phone Charger USB-C\
+12.Espresso Pods 20ct\
+13.Toilet Paper 12pk\
+14.Vitamin C 120ct\
+15.Paper Towels 6pk
+
+```{r}
+top_15_product_name <- sales_data_clean %>%
+  group_by(product_name) %>%
+  summarize( TOTAL_REVENUE = dollar(sum(line_revenue) )) %>%
+  arrange(desc(TOTAL_REVENUE)) %>%
+   #dollar(TOTAL_REVENUE) %>%
+  head(15) #%>%
+  #pull(product_name)
+  
+top_15_product_name
+
+top_city <- sales_data_clean %>% 
+
+            select(store_city, line_revenue) %>%
+
+            group_by(store_city) %>%
+
+            summarize(total_revenue = sum(line_revenue)) %>%
+
+            arrange(desc(total_revenue)) %>%
+
+            head(1) %>%
+
+            pull(store_city)
+ 
+top_city_rev <- sales_data_clean %>% 
+
+            select(store_city, line_revenue) %>%
+
+            group_by(store_city) %>%
+
+            summarize(total_revenue = sum(line_revenue)) %>%
+
+            arrange(desc(total_revenue)) %>%
+
+            head(1) %>%
+
+            pull(total_revenue) %>% dollar()
+
+ 
+```
+
+### Analysis 3: Analyze Location Data
+
+Question: What locations generated the most revenue? 1.New York\
+2.Los Angeles\
+3.Chicago\
+4.Dallas\
+5.Atlanta\
+6.Boston\
+7.Miami 8.Denver\
+9.Seattle\
+10.Phoenix
+
+```{r}
+top_location <- sales_data_clean %>%
+  group_by(store_city) %>%
+  summarize( total_revenue = sum(line_revenue) ) %>%
+  arrange(desc(total_revenue)) %>%
+   #dollar(total_discount) %>%
+  head(15) #%>%
+  #pull(store_city)
+  
+top_location
+
+
+```
+
+Question: What locations generated the most profit? 1.New York 
+2.Los Angeles 
+3.Chicago 
+4.Dallas
+5.Atlanta
+
+```{r Analysis 3-Location}
+store_data_analysis <- sales_data_clean %>%
+  group_by(store_city) %>%
+  summarize( total_discount = sum(line_discount),
+             total_revenue = sum(line_revenue),
+             total_profit = sum(gross_margin),
+             avg_gm_pcnt = mean(gross_margin_pcnt),
+             discount_ratio = total_revenue/total_discount
+             )
+
+
+most_discount_location <- store_data_analysis %>%  arrange(desc(total_revenue)) %>% head(5) %>% pull(store_city)
+
+most_discount_dollars <-  store_data_analysis %>%  arrange(desc(total_revenue)) %>%  head(5) %>% pull(total_revenue) %>% dollar()
+most_discount_location
+```
+
+### Analysis 4: Analyze Customer Type & Loyalty Data
+
+Question: What customer types generated the most revenue?
+
+```{r Analysis 4-Customer}
+customer_type_summary_data <- sales_data_clean%>%
+  group_by(customer_type, loyalty_member, promo_code)%>%
+summarise(
+total_revenue= sum(line_revenue),
+total_quantity = sum(quantity),
+total_profit = sum(gross_margin),
+revenue_per_unit = total_revenue/total_quantity,
+
+avg_unit_price = mean(unit_price),
+total_discount = sum(line_discount),
+disc_unit = total_discount/ total_quantity,
+mean_gm_pcnt = mean(gross_margin_pcnt),
+gm_per_unit = total_profit/ total_quantity)
+
+customer_type_summary_data 
+
+```
+```{r}
+sum_customer_type_summary_data <- sales_data_clean%>%
+  group_by(customer_type)%>%
+summarise(
+total_revenue= sum(line_revenue),
+total_quantity = sum(quantity),
+total_profit = sum(gross_margin),
+revenue_per_unit = total_revenue/total_quantity,
+
+avg_unit_price = mean(unit_price),
+total_discount = sum(line_discount),
+disc_unit = total_discount/ total_quantity,
+mean_gm_pcnt = mean(gross_margin_pcnt),
+gm_per_unit = total_profit/ total_quantity) %>%
+  arrange(desc(total_revenue)) %>%
+  head(1)
+
+sum_customer_type_summary_data 
+```
+The customer type that generated more revenue is returning.
+
+Question: What customer type generated the most profit?
+
+```{r}
+most_rev_by_customer_type <- customer_type_summary_data %>% 
+  arrange(desc(total_revenue)) %>%
+  head(1) %>%
+  pull(customer_type)
+most_rev_by_customer_type
+```
+Most revenue was generated through Returning customer.
+
+Question: Were Loyalty Programs Effective? Look at Revenue & Profit
+
+```{r}
+
+
+```
+
+### Analysis 5: Analyze Product Data
+
+Question: What products generated the most revenue?
+
+```{r Analysis 4-Product}
+top_product <- sales_data_clean %>% 
+
+            select(product_name, line_revenue) %>%
+
+            group_by(product_name) %>%
+
+            summarize(total_revenue = sum(line_revenue)) %>%
+
+            arrange(desc(total_revenue)) %>%
+
+            head(1) %>%
+
+             pull(product_name) #%>% dollar()
+
+top_product
+```
+USB Flash Drive 128GB
+
+Question: What products generated the most profit?
+
+```{r}
+top_5_product_rev <- sales_data_clean %>% 
+
+            select(product_name, line_revenue) %>%
+
+            group_by(product_name) %>%
+
+            summarize(total_revenue = sum(line_revenue)) %>%
+
+            arrange(desc(total_revenue)) %>%
+
+            head(5) %>%
+
+             pull(product_name) #%>% dollar()
+
+top_5_product_rev
+```
+Top 5 products:
+1. USB Flash Drive 128GB
+2. Premium Coffee Beans 1kg
+3. Espresso Pods 20ct
+4. Toilet Paper 12pk
+5. Luxury Chocolate 200g
+
+Question: What product is the highest REVENUE generating overall?
+
+```{r}
+top_product_rev <- sales_data_clean %>% 
+
+            select(product_name, line_revenue) %>%
+
+            group_by(product_name) %>%
+
+            summarize(total_revenue = sum(line_revenue)) %>%
+
+            arrange(desc(total_revenue)) %>%
+
+            head(1) #%>% dollar()
+
+top_product_rev
+
+```
+Highest revenue generating product is USB Flash Drive 128GB with total revenue of 34098.88.
+
+Question: What product is the highest PROFIT (gross margin) generating overall?
+
+```{r}
+
+most_profitable_product <- sales_data_clean %>%
+  group_by(product_name) %>%
+  summarise(
+    total_gross_margin = sum(gross_margin)
+  
+  ) %>%
+  arrange(desc(total_gross_margin)) %>%
+  head(1)
+
+most_profitable_product
+```
+USB Flash Drive 128GB is most profitable product.
+
+Question: Were the promotions effective? If so, which were effective?
+
+```{r}
+most_profitable_promo <- sales_data_clean %>%
+  group_by(promo_code) %>%
+  summarise(
+    total_revenue = sum(line_revenue, na.rm = TRUE),
+    total_gross_margin = sum(gross_margin, na.rm = TRUE),
+    avg_gm_percent = mean(gross_margin_pcnt, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  arrange(desc(total_gross_margin)) %>%
+  head(5)
+
+most_profitable_promo
+```
+The best performing promo code was SUMMER10 by gross margin but by gross percentage is was NONE.
+
+### Analysis 6: Evaluate the Revenue Trend Over the Year (aggregate sales)
+
+Question: Is sales revenue trending UP or DOWN?
+
+```{r Analysis 6-Sales Trend}
+trend_revenue <- sales_data_clean %>%
+  group_by(date) %>%
+  summarise(total_revenue = sum(line_revenue, na.rm = TRUE)) %>%
+  arrange(date)
+
+ggplot(trend_revenue, aes(x = date, y = total_revenue)) +
+  geom_line() +
+  labs(
+    title = "Revenue Trend Over Time",
+    x = "Date",
+    y = "Total Revenue"
+  ) +
+  theme_minimal()
+
+```
+The trend of sales revenue is mixed. Overall trend is upwards but if analyzed with details, it can be seen that May and June had low trend, between late June and late August there was a upward trend. After late August to september there is a sharper upward trend.
+
+Question: How is sales revenue trending UP or DOWN by Location?
+
+```{r}
+trend_revenue_location <- sales_data_clean %>%
+  group_by(date, store_city) %>%
+  summarise(total_revenue = sum(line_revenue, na.rm = TRUE)) %>%
+  arrange(date)
+
+ggplot(trend_revenue_location, aes(x = date, y = total_revenue)) +
+  geom_line() +
+  facet_wrap(~ store_city) +
+  theme_minimal()
+```
+Upward trend:
+
+New York- Strong upward trend with higher peaks around August-september.
+
+Chicago- Similar increasing trend over the months with high peaks.
+
+Los Angeles: Strong upward trend but high spikes in mid of the year.
+
+Mild/Slightly Upward and Downward Trend:
+
+Rest of the store location has higher trend except Miami and Phoenix.
+
+Denver and Dallas was flat in overall trend with small spike in mid year.
+
+Question: How are top products trending by Location?
+
+```{r}
+trend_products_location <- sales_data_clean %>%
+  group_by(date, store_city, product_name) %>%
+  summarise(total_revenue = sum(line_revenue, na.rm = TRUE)) 
+
+ggplot(trend_products_location,
+       aes(x = date, y = total_revenue)) +
+  geom_line() +
+  facet_grid(product_name ~ store_city) +
+  theme_minimal()
+# Evaluate the trend of revenue by store
+
+```
+
+
+Question: Which location is trending the best in terms of profit?
+
+```{r}
+
+top_location_profit <- sales_data_clean%>%
+  # filter(product_name== "Almonds 200g") %>%
+  group_by(store_city)%>%
+  
+summarise( total_revenue= sum(line_revenue, na.rm = TRUE),
+total_profit = sum(gross_margin, na.rm = TRUE),
+total_quantity = sum(quantity, na.rm = TRUE),
+revenue_per_unit = total_revenue/total_quantity) %>%
+  arrange(desc(total_profit))
+  
+  
+
+top_location_profit
+# Evaluate the trend of revenue by store
+
+
+
+# Evaluate the trend of revenue by store
+
+
+```
+These store locations are trending by profit by generating more profit:
+New York		
+Los Angeles			
+Chicago			
+Dallas			
+Boston			
+Miami			
+Denver			
+Seattle			
+Phoenix
+
+Question: Which product category is the trending the best in terms of profit?
+
+```{r}
+top_profitable_product<- sales_data_clean%>%
+  #filter(product_name== "Almonds 200g") %>%
+  group_by(product_name)%>%
+  
+summarise( total_revenue= sum(line_revenue),
+total_profit = sum(gross_margin),
+total_quantity = sum(quantity),
+revenue_per_unit = total_revenue/total_quantity) %>%
+  
+  arrange(desc(total_profit))
+
+# avg_unit_price = mean(unit_price),
+# total_discount = sum(total_revenue),
+# #disc_unit = total_revenue*discount_pct,
+# mean_gm_pcnt = mean(gross_margin_pcnt),
+# gm_per_unit = total_profit/ total_quantity)
+
+top_profitable_product
+
+top_profitable_product <- 0 #Replace with real values
+
+```
+USB Flash Drive 128GB is the trending the best in terms of profit.
+
+# III. Executive Summary
+
+> 
+
+A sum of $162,888 came in as total revenue, pulling a gross profit of $77,135.06 - solid returns show up clearly here. The bulk of that income ties back to just a few standout items, one alone hitting $34,098.88 at the top. Everyday picks like Ballpoint Pens 10ct bring steady gains, so do Notebook A5 units. Hand Soap 500ml turns a reliable margin, much like Toothpaste 100ml does too. Even Sparkling Water 12pk holds its ground, proving basics can deliver when priced right.
+
+Over there where New York sits on the map, numbers climb highest - $43,771.89 pulled in, leaving others behind by a stretch. Big city energy fuels most spikes, surges, uneven swings in income across zones.
+
+
+A tenth off tends to lift sales without slicing into profits, yet steeper cuts often shrink earnings even when income climbs. What holds margins together usually avoids going too far below ten percent.
+## At-a-glance
+
+-   **Total revenue:** **`r total_revenue`**
+-   **Total profit (gross margin):** **`r total_profit`**
+-   **Top product by revenue:** **`r top_rev_product`** (**`r top_rev_product_rev`**)
+-   **Top product by profit:** **`r most_profitable_product_name`** (**`r most_profitable_product_margin`**)
+
+```{r summary_top_location}
+# Optional: highlight the top location (if revenue_by_location exists from Analysis 3)
+
+```
+
+-   **Top location by revenue:** `r top_city` (`r top_city_rev`)
+
+## What this means (2–4 bullets)
+
+-  Profit margins look solid, yet most of the earnings come from just a handful of items.
+-  New York, Chicago, and Los Angeles are the critical revenue sites and should be strategic focus.
+-	 SUMMER10 and CLEARANCE are good promo codes and drives revenue upwards.
+-	 Existing customers provide more revenue and with the revenue it also boosts the sales and profit with it.
+
+
+## Recommended actions (2–4 bullets)
+
+-  Making sure there is enough inventory in top revenue locations like New York, Chicago and Los Angeles.
+
+-  Standardize the SUMMER10 promo code to keep the customers attracted.
+
+-  Keep the other promo code at minimum level.
+
+
+# IV. Communicate Findings \[Step 6\]
+
+This is the **evidence section**. It should connect directly back to the question/problem in Step 1 and point to the specific tables/plots generated in Step 4–5.
+
+## Key findings
+
+1.  **\[Revenue is highly dependent on small portion of the products\]**
+    -   Evidence: \ Pareto Chart (Top 20% of products generate ~80% of revenue).\\
+    -   Interpretation: \Limited number of products are making up most of the business \
+2.  **\[Major cities make up most of the revenues\]**
+    -   Evidence: \Revenue trend by city plot \\
+    -   Interpretation: \Major cities has strong spikes then other cities, which indicates more revenue \
+
+## Notes, assumptions, and limitations
+
+-   **\[Any missing data, skew, seasonality concerns, outliers, promo effects, etc.\]**
+
+-     A handful of big deals push overall numbers up, since income patterns favor larger amounts at the high end.
+-     Most sales are low in value but the occasional high value transaction make the distribution more broad and gives more outliers which manipulate the analysis.
+
+-     From May through September, shifts in seasonality could affect income levels.
+
+-   **\[What you would validate next if you had more time\]**
+
+-    Increase the sample size on promo codes to minimize the outliers.
+# V. Take Action \[Step 7\]
+
+Turn the findings into an **action plan** that someone can execute.
+
+## Actions to take now (0–30 days)
+
+-   \[Increase the stokes in top revenue cites with top revenue generating products\] — Owner: \[Stock buyer\] — Metric: \[Checking the quantity\] — Due: \[0-30 days\]
+
+## Actions to take next (30–90 days)
+
+-   \[Focus on strengthening  the interaction with returning customer and increasing the SUMMER10 promo code \] — Owner: \[Marketing\] — Metric: \[Revisiting the revenue trend by customer type and promo code\] — Due: \[30-90 days\]
+
+## Follow-up analysis to reduce uncertainty
+
+-   \[What additional cuts / experiments / segmentations would improve confidence\]
+
+-    The implication of other promo codes and less revenue generating products and location should be very selective.
